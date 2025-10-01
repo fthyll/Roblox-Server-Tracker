@@ -104,7 +104,7 @@ Jika di Replit, bot akan otomatis menjalankan Flask dan Keep Alive.
 
 ## 📷 Preview
 
-![Preview Embed](https://i.imgur.com/VBCp1Uu.png)
+![Preview Embed](./img/1.png)
 *(Contoh tampilan daftar server Roblox di Discord)*
 
 ---
