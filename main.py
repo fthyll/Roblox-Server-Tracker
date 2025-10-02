@@ -125,15 +125,19 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Gagal sync command: {e}")
 
-@bot.tree.command(name="servers", description="Tampilkan daftar server Roblox + jumlah pemain real-time")
-async def servers_cmd(interaction: discord.Interaction):
-    await interaction.response.defer()
-    servers = await fetch_servers()
-    if not servers:
-        await interaction.followup.send("❌ Tidak ada server yang aktif.")
-        return
-    paginator = ServerPaginator(servers)
-    await interaction.followup.send(embed=paginator.get_embed(), view=paginator)
+# 1. /status → Cek status bot & statistik server
+@bot.tree.command(name="status", description="Cek status bot dan statistik server Roblox")
+async def status_cmd(interaction: discord.Interaction):
+    status_text = "🟢 Online" if bot_status["online"] else "🔴 Offline"
+    embed = discord.Embed(
+        title="🤖 Bot Status",
+        description=f"**Status Bot:** {status_text}",
+        color=discord.Color.green() if bot_status["online"] else discord.Color.red()
+    )
+    embed.add_field(name="🌐 Total Server", value=str(bot_status["servers"]), inline=True)
+    embed.add_field(name="👥 Total Pemain", value=str(bot_status["players"]), inline=True)
+    embed.set_footer(text="Data real-time dari Roblox API")
+    await interaction.response.send_message(embed=embed)
 
 async def main():
     async with bot:
