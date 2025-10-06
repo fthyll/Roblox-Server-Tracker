@@ -262,6 +262,17 @@ async def status_cmd(interaction: discord.Interaction):
 async def ping_cmd(interaction: discord.Interaction):
     await interaction.response.send_message(f"🏓 Pong! Latency: `{round(bot.latency*1000)}ms`")
     
+# === Slash Command Uptime ===
+
+start_time = time.time()
+@bot.tree.command(name="uptime", description="Cek sudah berapa lama bot aktif")
+async def uptime_cmd(interaction: discord.Interaction):
+    delta = int(time.time() - start_time)
+    hrs, rem = divmod(delta, 3600)
+    mins, secs = divmod(rem, 60)
+    await interaction.response.send_message(f"⏱️ Bot sudah aktif selama: **{hrs}h {mins}m {secs}s**")
+
+    
 async def main():
     async with bot:
         while True:
