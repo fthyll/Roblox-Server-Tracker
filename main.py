@@ -125,7 +125,7 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Gagal sync command: {e}")
         
-#=== Slash Command ststus ===
+#=== Slash Command Status ===
 
 @bot.tree.command(name="status", description="Tampilkan statistik lengkap game Roblox Indo Voice")
 async def status_cmd(interaction: discord.Interaction):
@@ -255,7 +255,13 @@ async def status_cmd(interaction: discord.Interaction):
 
         view = ServerPaginator(servers_data)
         await interaction.followup.send(embed=embed, view=view)
+        
+# === Slash Command Ping ===
 
+@bot.tree.command(name="ping", description="Cek latency bot")
+async def ping_cmd(interaction: discord.Interaction):
+    await interaction.response.send_message(f"🏓 Pong! Latency: `{round(bot.latency*1000)}ms`")
+    
 async def main():
     async with bot:
         while True:
