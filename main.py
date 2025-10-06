@@ -140,63 +140,121 @@ async def status_cmd(interaction: discord.Interaction):
             place_info = await resp0.json()
             universe_id = place_info.get("universeId")
 
-    if not universe_id:
-        await interaction.followup.send("❌ Universe ID tidak ditemukan untuk Place ID tersebut.")
-        return
+        if not universe_id:
+            await interaction.followup.send("❌ Universe ID tidak ditemukan untuk Place ID tersebut.")
+            return
 
-    stats_url = f"https://games.roblox.com/v1/games?universeIds={universe_id}"
-    servers_url = f"https://games.roblox.com/v1/games/{PLACE_ID}/servers/Public?sortOrder=Asc&limit=100"
+        stats_url = f"https://games.roblox.com/v1/games?universeIds={universe_id}"
+        servers_url = f"https://games.roblox.com/v1/games/{PLACE_ID}/servers/Public?sortOrder=Asc&limit=100"
 
-    async with aiohttp.ClientSession() as session:
         async with session.get(stats_url) as resp1, session.get(servers_url) as resp2:
             if resp1.status != 200 or resp2.status != 200:
-                await interaction.followup.send("⚠️ Gagal mengambil data dari Roblox API.")
+                await interaction.followup.send("⚠️ Gagal mengambil data utama dari Roblox API.")
                 return
-
-            data = await resp1.json()
-            game_data = data["data"][0] if data["data"] else {}
+            stats_json = await resp1.json()
+            game_data = stats_json.get("data", [{}])[0] if isinstance(stats_json, dict) else {}
             servers_data = (await resp2.json()).get("data", [])
 
-    playing = game_data.get("playing", 0)
-    visits = game_data.get("visits", 0)
-    likes = game_data.get("totalUpVotes", 0)
-    dislikes = game_data.get("totalDownVotes", 0)
-    favorites = game_data.get("favoritedCount", 0)
-    servers = len(servers_data)
-    avg_ping = int(sum(s.get("ping", 0) for s in servers_data if "ping" in s) / servers) if servers else 0
-    avg_fps = 59
-    highest_players = max((s.get("playing", 0) for s in servers_data), default=0)
+        playing = game_data.get("playing", 0)
+        visits = game_data.get("visits", 0)
+        servers = len(servers_data)
+        avg_ping = int(sum(s.get("ping", 0) for s in servers_data if isinstance(s.get("ping", None), (int, float))) / servers) if servers else 0
+        avg_fps = 59
+        highest_players = max((s.get("playing", 0) for s in servers_data), default=0)
 
-    bot_status["servers"] = servers
-    bot_status["players"] = playing
+        votes = {"upVotes": 0, "downVotes": 0}
+        votes_candidates = [
+            f"https://games.roblox.com/v1/games/votes?universeIds={universe_id}",
+            f"https://games.roblox.com/v1/games/{universe_id}/votes",
+            f"https://games.roproxy.com/v1/games/votes?universeIds={universe_id}",
+            f"https://games.roproxy.com/v1/games/{universe_id}/votes",
+            f"https://games.roproxy.com/v1/games/{universe_id}/votes"
+        ]
 
-    embed = discord.Embed(
-        title="🎮 Indo Voice – Game Status",
-        description=f"**Last Updated:** <t:{int(time.time())}:R>\nRefreshing every 60s...",
-        color=discord.Color.dark_purple()
-    )
+        for url in votes_candidates:
+            try:
+                async with session.get(url) as rv:
+                    if rv.status != 200:
+                        continue
+                    try:
+                        j = await rv.json()
+                    except Exception:
+                        text = await rv.text()
+                        print("votes: non-json response (truncated):", text[:400])
+                        continue
 
-    embed.add_field(name="👥 Playing", value=f"**{playing:,}** Players", inline=True)
-    embed.add_field(name="👑 Highest Players", value=f"**{highest_players:,}** Players", inline=True)
-    embed.add_field(name="📈 Visits", value=f"**{visits:,}** Visits", inline=True)
-    embed.add_field(name="👍 Likes", value=f"**{likes:,}** Likes", inline=True)
-    embed.add_field(name="👎 Dislikes", value=f"**{dislikes:,}** Dislikes", inline=True)
-    embed.add_field(name="⭐ Favorites", value=f"**{favorites:,}** Favorites", inline=True)
-    embed.add_field(name="🖥️ Servers", value=f"**{servers:,}** Servers", inline=True)
-    embed.add_field(name="⚡ Avg FPS", value=f"**{avg_fps}** Fps", inline=True)
-    embed.add_field(name="📶 Avg Ping", value=f"**{avg_ping}** ms", inline=True)
+                    if isinstance(j, dict) and "data" in j and isinstance(j["data"], list) and j["data"]:
+                        v = j["data"][0]
+                        votes["upVotes"] = v.get("upVotes", v.get("upvotes", v.get("upvote", votes["upVotes"])))
+                        votes["downVotes"] = v.get("downVotes", v.get("downvotes", v.get("downvote", votes["downVotes"])))
+                    else:
+                        votes["upVotes"] = j.get("upVotes", j.get("upvotes", j.get("upVote", votes["upVotes"])))
+                        votes["downVotes"] = j.get("downVotes", j.get("downvotes", j.get("downVote", votes["downVotes"])))
+                    break
+            except Exception as e:
+                print("votes fetch error:", e)
+                continue
+            
+        favorites_count = game_data.get("favoritedCount", 0)
+        fav_candidates = [
+            f"https://games.roblox.com/v1/games/{universe_id}/favorites/count",
+            f"https://games.roproxy.com/v1/games/{universe_id}/favorites/count"
+        ]
+        for url in fav_candidates:
+            try:
+                async with session.get(url) as rf:
+                    if rf.status != 200:
+                        continue
+                    try:
+                        j = await rf.json()
+                    except Exception:
+                        text = await rf.text()
+                        print("favorites: non-json response (truncated):", text[:400])
+                        continue
+                    if isinstance(j, dict) and "count" in j:
+                        favorites_count = j.get("count", favorites_count)
+                        break
+                    if isinstance(j, int):
+                        favorites_count = j
+                        break
+            except Exception as e:
+                print("favorites fetch error:", e)
+                continue
 
-    embed.set_footer(text="Data real-time dari Roblox API | Indo Voice Monitor")
-    embed.timestamp = discord.utils.utcnow()
+        likes = votes.get("upVotes", 0)
+        dislikes = votes.get("downVotes", 0)
+        favorites = favorites_count
 
-    servers_data.sort(key=lambda s: s.get("playing", 0), reverse=True)
+        bot_status["servers"] = servers
+        bot_status["players"] = playing
 
-    if servers == 0:
-        await interaction.followup.send(embed=embed)
-        return
+        servers_data.sort(key=lambda s: s.get("playing", 0), reverse=True)
 
-    view = ServerPaginator(servers_data)
-    await interaction.followup.send(embed=embed, view=view)
+        embed = discord.Embed(
+            title="🎮 Indo Voice – Game Status",
+            description=f"**Last Updated:** <t:{int(time.time())}:R>\nRefreshing every 60s...",
+            color=discord.Color.dark_purple()
+        )
+
+        embed.add_field(name="👥 Playing", value=f"**{playing:,}** Players", inline=True)
+        embed.add_field(name="👑 Highest Players", value=f"**{highest_players:,}** Players", inline=True)
+        embed.add_field(name="📈 Visits", value=f"**{visits:,}** Visits", inline=True)
+        embed.add_field(name="👍 Likes", value=f"**{likes:,}** Likes", inline=True)
+        embed.add_field(name="👎 Dislikes", value=f"**{dislikes:,}** Dislikes", inline=True)
+        embed.add_field(name="⭐ Favorites", value=f"**{favorites:,}** Favorites", inline=True)
+        embed.add_field(name="🖥️ Servers", value=f"**{servers:,}** Servers", inline=True)
+        embed.add_field(name="⚡ Avg FPS", value=f"**{avg_fps}** Fps", inline=True)
+        embed.add_field(name="📶 Avg Ping", value=f"**{avg_ping}** ms", inline=True)
+
+        embed.set_footer(text="Data real-time dari Roblox API | Indo Voice Monitor")
+        embed.timestamp = discord.utils.utcnow()
+
+        if servers == 0:
+            await interaction.followup.send(embed=embed)
+            return
+
+        view = ServerPaginator(servers_data)
+        await interaction.followup.send(embed=embed, view=view)
 
 async def main():
     async with bot:
