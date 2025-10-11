@@ -272,7 +272,57 @@ async def uptime_cmd(interaction: discord.Interaction):
     mins, secs = divmod(rem, 60)
     await interaction.response.send_message(f"⏱️ Bot sudah aktif selama: **{hrs}h {mins}m {secs}s**")
 
-    
+# === Slash Command Userinfo ===
+
+@bot.tree.command(name="userinfo", description="Lihat informasi lengkap tentang pengguna Discord")
+async def userinfo_cmd(interaction: discord.Interaction, member: discord.Member = None):
+    member = member or interaction.user
+
+    color = member.color if member.color.value != 0 else discord.Color.blue()
+
+    status = str(member.status).capitalize()
+    activity = None
+    if member.activity:
+        activity = f"{member.activity.type.name.title()} {member.activity.name}"
+
+    created = f"<t:{int(member.created_at.timestamp())}:R>"
+    joined = f"<t:{int(member.joined_at.timestamp())}:R>" if member.joined_at else "Unknown"
+
+    roles = [r.mention for r in member.roles[1:]]
+    role_list = ", ".join(roles[-15:]) if roles else "Tidak punya role."
+    top_role = member.top_role.mention if len(member.roles) > 1 else "Tidak ada"
+
+    perms = []
+    if member.guild_permissions.administrator:
+        perms.append("🛡️ Administrator")
+    if member.guild_permissions.manage_messages:
+        perms.append("🔧 Manage Messages")
+    if member.guild_permissions.kick_members:
+        perms.append("🥾 Kick Members")
+    if member.guild_permissions.ban_members:
+        perms.append("⛔ Ban Members")
+    if not perms:
+        perms.append("👤 Member Biasa")
+
+    embed = discord.Embed(
+        title=f"👤 Informasi Pengguna: {member.display_name}",
+        color=color,
+        timestamp=discord.utils.utcnow()
+    )
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.add_field(name="🪪 Username", value=f"{member} (`{member.id}`)", inline=False)
+    embed.add_field(name="🧾 Display Name", value=member.display_name, inline=True)
+    embed.add_field(name="💬 Status", value=status, inline=True)
+    embed.add_field(name="🎮 Aktivitas", value=activity or "Tidak ada", inline=False)
+    embed.add_field(name="📅 Akun Dibuat", value=created, inline=True)
+    embed.add_field(name="📥 Bergabung Server", value=joined, inline=True)
+    embed.add_field(name="🎭 Role Tertinggi", value=top_role, inline=True)
+    embed.add_field(name=f"📜 Roles ({len(roles)})", value=role_list, inline=False)
+    embed.add_field(name="🔐 Permissions", value=", ".join(perms), inline=False)
+    embed.set_footer(text=f"Diminta oleh {interaction.user}", icon_url=interaction.user.display_avatar.url)
+
+    await interaction.response.send_message(embed=embed)
+      
 async def main():
     async with bot:
         while True:
